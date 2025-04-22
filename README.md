@@ -28,8 +28,8 @@ your async code.
 ### Deadlines and Cancelation
 
 Each IO operation creates a `Task`. When scheduling a task on the runtime, the
-caller receives a pointer to the `Task` at which point they may cancel it, or
-set a deadline:
+caller receives a pointer to the `Task` at which point they could cancel it, or
+set a deadline.
 
 ```zig
 // Timers are always relative time
