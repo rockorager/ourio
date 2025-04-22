@@ -75,8 +75,8 @@ _ = try main_rt.msgRing(thread_rt, target_task, .{});
 ### Multiple Rings on the same thread
 
 You can have multiple Rings in a single thread. One could be a priority
-Ring, or handle specific types of tasks, etc. Poll any runtime from any other
-runtime.
+Ring, or handle specific types of tasks, etc. Poll any `Ring` from any other
+`Ring`.
 
 ```zig
 const fd = rt1.backend.pollableFd();
