@@ -243,7 +243,7 @@ fn getSqe(self: *Uring) *linux.io_uring_sqe {
     return self.ring.get_sqe() catch unreachable;
 }
 
-pub fn reapCompletions(self: *Uring, rt: *io.Runtime) anyerror!void {
+pub fn reapCompletions(self: *Uring, rt: *io.Ring) anyerror!void {
     var cqes: [64]linux.io_uring_cqe = undefined;
     const n = self.ring.copy_cqes(&cqes, 0) catch |err| {
         switch (err) {

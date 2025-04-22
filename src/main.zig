@@ -24,8 +24,8 @@ pub const has_kqueue = switch (builtin.os.tag) {
 pub const has_io_uring = builtin.os.tag == .linux;
 
 pub const Task = @import("Task.zig");
-pub const Callback = *const fn (*Runtime, Task) anyerror!void;
-pub fn noopCallback(_: *Runtime, _: Task) anyerror!void {}
+pub const Callback = *const fn (*Ring, Task) anyerror!void;
+pub fn noopCallback(_: *Ring, _: Task) anyerror!void {}
 
 pub const RunCondition = enum {
     once,
@@ -103,7 +103,7 @@ pub const Backend = union(enum) {
 
     pub fn reapCompletions(
         self: *Backend,
-        rt: *Runtime,
+        rt: *Ring,
     ) !void {
         return switch (self.*) {
             inline else => |*backend| backend.reapCompletions(rt),
@@ -121,7 +121,7 @@ pub const CompletionQueue = Queue(Task, .complete);
 pub const FreeQueue = Queue(Task, .free);
 pub const SubmissionQueue = Queue(Task, .in_flight);
 
-pub const Runtime = struct {
+pub const Ring = struct {
     backend: Backend,
     gpa: Allocator,
 
@@ -129,21 +129,21 @@ pub const Runtime = struct {
     submission_q: SubmissionQueue = .{},
     free_q: FreeQueue = .{},
 
-    pub fn init(gpa: Allocator, entries: u16) !Runtime {
+    pub fn init(gpa: Allocator, entries: u16) !Ring {
         return .{
             .backend = .{ .platform = try .init(gpa, entries) },
             .gpa = gpa,
         };
     }
 
-    pub fn initChild(self: *Runtime, entries: u16) !Runtime {
+    pub fn initChild(self: *Ring, entries: u16) !Ring {
         return .{
             .backend = try self.backend.initChild(entries),
             .gpa = self.gpa,
         };
     }
 
-    pub fn initMock(gpa: Allocator, entries: u16) !Runtime {
+    pub fn initMock(gpa: Allocator, entries: u16) !Ring {
         return .{
             .backend = .{ .mock = try .init(entries) },
             .gpa = gpa,
@@ -153,14 +153,14 @@ pub const Runtime = struct {
         };
     }
 
-    pub fn deinit(self: *Runtime) void {
+    pub fn deinit(self: *Ring) void {
         self.backend.deinit(self.gpa);
         while (self.free_q.pop()) |task| self.gpa.destroy(task);
         while (self.submission_q.pop()) |task| self.gpa.destroy(task);
         while (self.completion_q.pop()) |task| self.gpa.destroy(task);
     }
 
-    pub fn run(self: *Runtime, condition: RunCondition) !void {
+    pub fn run(self: *Ring, condition: RunCondition) !void {
         while (true) {
             try self.backend.submitAndWait(&self.submission_q);
             try self.backend.reapCompletions(self);
@@ -172,12 +172,12 @@ pub const Runtime = struct {
         }
     }
 
-    pub fn getTask(self: *Runtime) Allocator.Error!*Task {
+    pub fn getTask(self: *Ring) Allocator.Error!*Task {
         return self.free_q.pop() orelse try self.gpa.create(Task);
     }
 
     pub fn noop(
-        self: *Runtime,
+        self: *Ring,
         ctx: Context,
     ) Allocator.Error!*Task {
         const task = try self.getTask();
@@ -193,7 +193,7 @@ pub const Runtime = struct {
     }
 
     pub fn timer(
-        self: *Runtime,
+        self: *Ring,
         duration: Timespec,
         ctx: Context,
     ) Allocator.Error!*Task {
@@ -209,7 +209,7 @@ pub const Runtime = struct {
         return task;
     }
 
-    pub fn cancelAll(self: *Runtime) Allocator.Error!void {
+    pub fn cancelAll(self: *Ring) Allocator.Error!void {
         const task = try self.getTask();
         task.* = .{
             .req = .{ .cancel = .all },
@@ -219,7 +219,7 @@ pub const Runtime = struct {
     }
 
     pub fn accept(
-        self: *Runtime,
+        self: *Ring,
         fd: posix.fd_t,
         ctx: Context,
     ) Allocator.Error!*Task {
@@ -236,8 +236,8 @@ pub const Runtime = struct {
     }
 
     pub fn msgRing(
-        self: *Runtime,
-        target: *Runtime,
+        self: *Ring,
+        target: *Ring,
         target_task: *Task, // The task that the target ring will receive. The callbacks of
         // this task are what will be called when the target receives the message
 
@@ -260,7 +260,7 @@ pub const Runtime = struct {
     }
 
     pub fn recv(
-        self: *Runtime,
+        self: *Ring,
         fd: posix.fd_t,
         buffer: []u8,
         ctx: Context,
@@ -281,7 +281,7 @@ pub const Runtime = struct {
     }
 
     pub fn write(
-        self: *Runtime,
+        self: *Ring,
         fd: posix.fd_t,
         buffer: []const u8,
         ctx: Context,
@@ -302,7 +302,7 @@ pub const Runtime = struct {
     }
 
     pub fn writev(
-        self: *Runtime,
+        self: *Ring,
         fd: posix.fd_t,
         vecs: []const posix.iovec_const,
         ctx: Context,
@@ -323,7 +323,7 @@ pub const Runtime = struct {
     }
 
     pub fn close(
-        self: *Runtime,
+        self: *Ring,
         fd: posix.fd_t,
         ctx: Context,
     ) Allocator.Error!*Task {
@@ -340,7 +340,7 @@ pub const Runtime = struct {
     }
 
     pub fn poll(
-        self: *Runtime,
+        self: *Ring,
         fd: posix.fd_t,
         mask: u32,
         ctx: Context,
@@ -358,7 +358,7 @@ pub const Runtime = struct {
     }
 
     pub fn socket(
-        self: *Runtime,
+        self: *Ring,
         domain: u32,
         socket_type: u32,
         protocol: u32,
@@ -377,7 +377,7 @@ pub const Runtime = struct {
     }
 
     pub fn connect(
-        self: *Runtime,
+        self: *Ring,
         fd: posix.socket_t,
         addr: *posix.sockaddr,
         addr_len: posix.socklen_t,
@@ -411,7 +411,7 @@ pub const Op = enum {
     socket,
     connect,
 
-    /// userfd is meant to send file descriptors between Runtime instances (using msgRing)
+    /// userfd is meant to send file descriptors between Ring instances (using msgRing)
     userfd,
     /// usermsg is meant to send a u16 between runtime instances (using msgRing)
     usermsg,
@@ -429,7 +429,7 @@ pub const Request = union(Op) {
     },
     accept: posix.fd_t,
     msg_ring: struct {
-        target: *Runtime,
+        target: *Ring,
         task: *Task,
     },
     recv: struct {
@@ -521,14 +521,14 @@ test {
 const Foo = struct {
     bar: usize = 0,
 
-    fn callback(_: *io.Runtime, task: io.Task) anyerror!void {
+    fn callback(_: *io.Ring, task: io.Task) anyerror!void {
         const self = task.userdataCast(Foo);
         self.bar += 1;
     }
 };
 
 test "runtime: noop" {
-    var rt: io.Runtime = try .init(std.testing.allocator, 16);
+    var rt: io.Ring = try .init(std.testing.allocator, 16);
     defer rt.deinit();
 
     var foo: Foo = .{};
@@ -546,7 +546,7 @@ test "runtime: noop" {
 }
 
 test "runtime: timer" {
-    var rt: io.Runtime = try .init(std.testing.allocator, 16);
+    var rt: io.Ring = try .init(std.testing.allocator, 16);
     defer rt.deinit();
 
     var foo: Foo = .{};
@@ -562,7 +562,7 @@ test "runtime: timer" {
 }
 
 test "runtime: poll" {
-    var rt: io.Runtime = try .init(std.testing.allocator, 16);
+    var rt: io.Ring = try .init(std.testing.allocator, 16);
     defer rt.deinit();
 
     var foo: Foo = .{};
@@ -580,7 +580,7 @@ test "runtime: poll" {
 
 test "runtime: deadline doesn't call user callback" {
     const gpa = std.testing.allocator;
-    var rt = try io.Runtime.init(gpa, 16);
+    var rt = try io.Ring.init(gpa, 16);
     defer rt.deinit();
 
     var foo: Foo = .{};
@@ -596,7 +596,7 @@ test "runtime: deadline doesn't call user callback" {
 
 test "runtime: timeout" {
     const gpa = std.testing.allocator;
-    var rt = try io.Runtime.init(gpa, 16);
+    var rt = try io.Ring.init(gpa, 16);
     defer rt.deinit();
 
     var foo: Foo = .{};
@@ -613,7 +613,7 @@ test "runtime: timeout" {
 
 test "runtime: cancel" {
     const gpa = std.testing.allocator;
-    var rt = try io.Runtime.init(gpa, 16);
+    var rt = try io.Ring.init(gpa, 16);
     defer rt.deinit();
 
     var foo: Foo = .{};
@@ -633,13 +633,13 @@ test "runtime: cancel" {
 
 test "runtime: cancel all" {
     const gpa = std.testing.allocator;
-    var rt = try io.Runtime.init(gpa, 16);
+    var rt = try io.Ring.init(gpa, 16);
     defer rt.deinit();
 
     const Foo2 = struct {
         bar: usize = 0,
 
-        fn callback(_: *io.Runtime, task: io.Task) anyerror!void {
+        fn callback(_: *io.Ring, task: io.Task) anyerror!void {
             const self = task.userdataCast(@This());
             const result = task.result.?;
             _ = result.timer catch |err| {
@@ -669,7 +669,7 @@ test "runtime: cancel all" {
 
 test "runtime: msgRing" {
     const gpa = std.testing.allocator;
-    var rt1 = try io.Runtime.init(gpa, 16);
+    var rt1 = try io.Ring.init(gpa, 16);
     defer rt1.deinit();
 
     var rt2 = try rt1.initChild(16);
@@ -681,7 +681,7 @@ test "runtime: msgRing" {
 
         const Msg = enum { rt1, rt2 };
 
-        fn callback(_: *io.Runtime, task: io.Task) anyerror!void {
+        fn callback(_: *io.Ring, task: io.Task) anyerror!void {
             const self = task.userdataCast(@This());
             const msg = task.msgToEnum(Msg);
             switch (msg) {

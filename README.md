@@ -16,7 +16,7 @@ Ourio has io_uring and kqueue backends. Ourio supports the `msg_ring`
 capability of io_uring to pass a completion from one ring to another. This
 allows a multithreaded application to implement message passing using io_uring
 (or kqueue, if that's your flavor). Multithreaded applications should plan to
-use one `Runtime` per thread. Submission onto the runtime is not thread safe,
+use one `Ring` per thread. Submission onto the runtime is not thread safe,
 any message passing must occur using `msg_ring` rather than directly submitting
 a task to another
 
@@ -61,17 +61,17 @@ target_task.* {
     .req = .{ .userfd = fd },
 };
 
-// Send target_task from the main_rt thread to the thread_rt Runtime. The
-// thread_rt Runtime will then // process the task as a completion, ie
+// Send target_task from the main_rt thread to the thread_rt Ring. The
+// thread_rt Ring will then // process the task as a completion, ie
 // Worker.onCompletion will be called with // this task. That thread can then
 // schedule a recv, a write, etc on the file // descriptor it just received.
 _ = try main_rt.msgRing(thread_rt, target_task, .{});
 ```
 
-### Multiple Runtimes on the same thread
+### Multiple Rings on the same thread
 
-You can have multiple Runtimes in a single thread. One could be a priority
-Runtime, or handle specific types of tasks, etc. Poll any runtime from any other
+You can have multiple Rings in a single thread. One could be a priority
+Ring, or handle specific types of tasks, etc. Poll any runtime from any other
 runtime.
 
 ```zig
@@ -110,7 +110,7 @@ pub const MultiWriter = struct {
         try self.buf.appendSlice(gpa, bytes);
     }
 
-    pub fn flush(self: *MultiWriter, rt: *io.Runtime) !void {
+    pub fn flush(self: *MultiWriter, rt: *io.Ring) !void {
         if (self.fd1_written < self.buf.items.len) {
             _ = try rt.write(self.fd1, self.buf.items[self.fd1_written..], .{
                 .ptr = self,
@@ -128,7 +128,7 @@ pub const MultiWriter = struct {
         }
     }
 
-    pub fn onCompletion(rt: *io.Runtime, task: io.Task) anyerror!void {
+    pub fn onCompletion(rt: *io.Ring, task: io.Task) anyerror!void {
         const self = task.userdataCast(MultiWriter);
         const result = task.result.?;
 
@@ -151,7 +151,7 @@ pub const MultiWriter = struct {
 
 pub fn main() !void {
     var gpa: std.heap.DebugAllocator(.{}) = .init;
-    var rt: io.Runtime = try .init(gpa.allocator(), 16);
+    var rt: io.Ring = try .init(gpa.allocator(), 16);
     defer rt.deinit();
 
     // Pretend I created some files

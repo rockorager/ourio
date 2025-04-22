@@ -4,7 +4,7 @@ const std = @import("std");
 const io = @import("main.zig");
 
 const Allocator = std.mem.Allocator;
-const Runtime = io.Runtime;
+const Ring = io.Ring;
 
 userdata: ?*anyopaque = null,
 msg: u16 = 0,
@@ -37,7 +37,7 @@ prev: ?*Task = null,
 
 pub fn setDeadline(
     self: *Task,
-    rt: *Runtime,
+    rt: *Ring,
     deadline: io.Timespec,
 ) Allocator.Error!void {
     std.debug.assert(!deadline.isZero());
@@ -55,7 +55,7 @@ pub fn setDeadline(
 
 pub fn cancel(
     self: *Task,
-    rt: *Runtime,
+    rt: *Ring,
     ctx: io.Context,
 ) Allocator.Error!void {
     const task = try rt.getTask();

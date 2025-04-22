@@ -548,7 +548,7 @@ pub fn pollableFd(self: Kqueue) !posix.fd_t {
     return self.kq;
 }
 
-pub fn reapCompletions(self: *Kqueue, rt: *io.Runtime) anyerror!void {
+pub fn reapCompletions(self: *Kqueue, rt: *io.Ring) anyerror!void {
     defer self.event_idx = 0;
 
     if (self.event_idx == 0) {
@@ -604,7 +604,7 @@ pub fn reapCompletions(self: *Kqueue, rt: *io.Runtime) anyerror!void {
 /// to call the callback and return the task(s) to the free list
 fn handleSynchronousCompletion(
     self: *Kqueue,
-    rt: *io.Runtime,
+    rt: *io.Ring,
     task: *io.Task,
 ) !void {
     switch (task.req) {
@@ -685,7 +685,7 @@ fn unexpectedError(err: posix.E) posix.UnexpectedError {
 
 fn handleCompletion(
     self: *Kqueue,
-    rt: *io.Runtime,
+    rt: *io.Ring,
     task: *io.Task,
     event: posix.Kevent,
 ) !void {
@@ -790,7 +790,7 @@ fn handleCompletion(
     }
 }
 
-fn releaseTask(self: *Kqueue, rt: *io.Runtime, task: *io.Task) void {
+fn releaseTask(self: *Kqueue, rt: *io.Ring, task: *io.Task) void {
     rt.free_q.push(task);
     if (task.deadline) |d| {
         // remove the deadline
@@ -805,7 +805,7 @@ fn releaseTask(self: *Kqueue, rt: *io.Runtime, task: *io.Task) void {
     }
 }
 
-fn handleExpiredTimer(self: *Kqueue, rt: *io.Runtime, t: Timer) !void {
+fn handleExpiredTimer(self: *Kqueue, rt: *io.Ring, t: Timer) !void {
     switch (t) {
         .deadline => |deadline| {
             defer self.releaseTask(rt, deadline.task);

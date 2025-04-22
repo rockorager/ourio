@@ -81,7 +81,7 @@ pub fn submit(self: *Mock, queue: *Queue(io.Task, .in_flight)) !void {
     }
 }
 
-pub fn reapCompletions(self: *Mock, rt: *io.Runtime) anyerror!void {
+pub fn reapCompletions(self: *Mock, rt: *io.Ring) anyerror!void {
     while (self.completions.pop()) |task| {
         try task.callback(rt, task.*);
         rt.free_q.push(task);

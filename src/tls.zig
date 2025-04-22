@@ -22,7 +22,7 @@ pub const Client = struct {
     written: usize = 0,
 
     userdata: ?*anyopaque = null,
-    callback: *const fn (*io.Runtime, io.Task) anyerror!void = io.noopCallback,
+    callback: *const fn (*io.Ring, io.Task) anyerror!void = io.noopCallback,
     close_msg: u16 = 0,
     write_msg: u16 = 0,
     recv_msg: u16 = 0,
@@ -38,7 +38,7 @@ pub const Client = struct {
         handshake: tls.nonblock.Client,
         task: *io.Task,
 
-        pub fn handleMsg(rt: *io.Runtime, task: io.Task) anyerror!void {
+        pub fn handleMsg(rt: *io.Ring, task: io.Task) anyerror!void {
             const self = task.userdataCast(HandshakeTask);
             const result = task.result.?;
 
@@ -148,7 +148,7 @@ pub const Client = struct {
 
         /// Tries to cancel the handshake. Callback will receive an error.Canceled if cancelation
         /// was successful, otherwise handhsake will proceed
-        pub fn cancel(self: *HandshakeTask, rt: *io.Runtime) void {
+        pub fn cancel(self: *HandshakeTask, rt: *io.Ring) void {
             self.task.cancel(rt, null, 0, io.noopCallback) catch {};
         }
     };
@@ -162,7 +162,7 @@ pub const Client = struct {
     /// Initializes a handshake, which will ultimately deliver a Client to the callback via a
     /// userptr result
     pub fn init(
-        rt: *io.Runtime,
+        rt: *io.Ring,
         fd: posix.fd_t,
         opts: tls.config.Client,
         ctx: io.Context,
@@ -189,7 +189,7 @@ pub const Client = struct {
         self.cleartext_buf.deinit(gpa);
     }
 
-    pub fn close(self: *Client, gpa: Allocator, rt: *io.Runtime) !void {
+    pub fn close(self: *Client, gpa: Allocator, rt: *io.Ring) !void {
         // close notify is 2 bytes long
         const len = self.tls.encryptedLength(2);
         try self.ciphertext_buf.ensureUnusedCapacity(gpa, len);
@@ -209,7 +209,7 @@ pub const Client = struct {
         }
     }
 
-    fn onCompletion(rt: *io.Runtime, task: io.Task) anyerror!void {
+    fn onCompletion(rt: *io.Ring, task: io.Task) anyerror!void {
         const self = task.userdataCast(Client);
         const result = task.result.?;
 
@@ -317,7 +317,7 @@ pub const Client = struct {
         }
     }
 
-    pub fn recv(self: *Client, rt: *io.Runtime) !void {
+    pub fn recv(self: *Client, rt: *io.Ring) !void {
         if (self.recv_task != null) return;
         self.recv_task = try rt.recv(
             self.fd,
@@ -330,7 +330,7 @@ pub const Client = struct {
         try self.cleartext_buf.appendSlice(gpa, bytes);
     }
 
-    pub fn flush(self: *Client, gpa: Allocator, rt: *io.Runtime) !void {
+    pub fn flush(self: *Client, gpa: Allocator, rt: *io.Ring) !void {
         const len = self.tls.encryptedLength(self.cleartext_buf.items.len);
         try self.ciphertext_buf.ensureUnusedCapacity(gpa, len);
         const slice = self.ciphertext_buf.unusedCapacitySlice();
@@ -372,7 +372,7 @@ test "tls: Client" {
     const net = @import("net.zig");
     const gpa = std.testing.allocator;
 
-    var rt = try io.Runtime.init(gpa, 16);
+    var rt = try io.Ring.init(gpa, 16);
     defer rt.deinit();
 
     const Foo = struct {
@@ -389,7 +389,7 @@ test "tls: Client" {
             recv,
         };
 
-        fn callback(_: *io.Runtime, task: io.Task) anyerror!void {
+        fn callback(_: *io.Ring, task: io.Task) anyerror!void {
             const self = task.userdataCast(Self);
             const result = task.result.?;
             errdefer {

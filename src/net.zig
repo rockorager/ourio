@@ -8,7 +8,7 @@ const Uri = std.Uri;
 const assert = std.debug.assert;
 
 pub fn tcpConnectToHost(
-    rt: *io.Runtime,
+    rt: *io.Ring,
     host: []const u8,
     port: u16,
     ctx: io.Context,
@@ -26,7 +26,7 @@ pub fn tcpConnectToHost(
 }
 
 pub fn tcpConnectToAddr(
-    rt: *io.Runtime,
+    rt: *io.Ring,
     addr: std.net.Address,
     ctx: io.Context,
 ) Allocator.Error!*ConnectTask {
@@ -68,11 +68,11 @@ pub const ConnectTask = struct {
     /// Cancels the current task. Not guaranteed to actually cancel. User's callback will get an
     /// error.Canceled if cancelation was successful, otherwise the operation will complete as
     /// normal and this is essentially a no-op
-    pub fn cancel(self: *ConnectTask, rt: *io.Runtime) void {
+    pub fn cancel(self: *ConnectTask, rt: *io.Ring) void {
         _ = self.task.cancel(rt, null, 0, io.noopCallback) catch {};
     }
 
-    pub fn handleMsg(rt: *io.Runtime, task: io.Task) anyerror!void {
+    pub fn handleMsg(rt: *io.Ring, task: io.Task) anyerror!void {
         const self = task.userdataCast(ConnectTask);
         const result = task.result.?;
         switch (task.msgToEnum(Msg)) {
@@ -127,7 +127,7 @@ pub const ConnectTask = struct {
 };
 
 test "tcp connect" {
-    var rt: io.Runtime = try .init(std.testing.allocator, 16);
+    var rt: io.Ring = try .init(std.testing.allocator, 16);
     defer rt.deinit();
 
     const addr: std.net.Address = try .parseIp4("127.0.0.1", 80);
