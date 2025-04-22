@@ -124,7 +124,7 @@ pub const MultiWriter = struct {
         }
 
         if (self.fd2_written < self.buf.items.len) {
-            _ = try rt.write(self.fd2, self.buf.items[self.fd2_written], .{
+            _ = try rt.write(self.fd2, self.buf.items[self.fd2_written..], .{
                 .ptr = self,
                 .msg = @intFromEnum(Msg.fd2),
                 .cb = MultiWriter.onCompletion,
