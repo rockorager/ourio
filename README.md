@@ -1,5 +1,9 @@
 # Ourio
 
+<p align="center">
+  <img width="128" height="128" src="ouroboros.svg">
+</p>
+
 Ourio (prounounced "oreo", think "Ouroboros") is an asynchronous IO runtime
 built heavily around the semantics of io_uring. The design is inspired by
 [libxev](https://github.com/mitchellh/libxev), which is in turn inspired by
