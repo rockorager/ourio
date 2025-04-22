@@ -4,7 +4,7 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const io_mod = b.createModule(.{
+    const io_mod = b.addModule("ourio", .{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
