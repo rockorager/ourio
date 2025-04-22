@@ -99,7 +99,7 @@ pub const MultiWriter = struct {
     fd1: posix.fd_t,
     fd1_written: usize = 0,
 
-    fd2: posix.fd_2,
+    fd2: posix.fd_t,
     fd2_written: usize = 0,
 
     buf: std.ArrayListUnmanaged(u8),
