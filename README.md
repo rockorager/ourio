@@ -77,9 +77,9 @@ runtime.
 ```zig
 const fd = rt1.backend.pollableFd();
 _ = try rt2.poll(fd, .{
-	.cb = onCompletion, 
-	.msg = @intFromEnum(Msg.rt1_has_completions)}
-    );
+    .cb = onCompletion, 
+    .msg = @intFromEnum(Msg.rt1_has_completions)}
+);
 ```
 
 ## Example
