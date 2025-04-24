@@ -346,19 +346,21 @@ pub fn reapCompletions(self: *Uring, rt: *io.Ring) anyerror!void {
             .userfd, .userptr => unreachable,
         };
 
-        try task.callback(rt, task.*);
-
-        if (cqe.flags & msg_ring_received_cqe != 0) {
-            // This message was received from another ring. We don't decrement inflight for this.
-            // But we do need to set the task as free because we will add it to our free list
-            rt.free_q.push(task);
-        } else if (cqe.flags & linux.IORING_CQE_F_MORE == 0) {
-            // If the cqe doesn't have IORING_CQE_F_MORE set, then this task is complete and free to
-            // be rescheduled
-            task.state = .complete;
-            self.in_flight.remove(task);
-            rt.free_q.push(task);
+        defer {
+            if (cqe.flags & msg_ring_received_cqe != 0) {
+                // This message was received from another ring. We don't decrement inflight for this.
+                // But we do need to set the task as free because we will add it to our free list
+                rt.free_q.push(task);
+            } else if (cqe.flags & linux.IORING_CQE_F_MORE == 0) {
+                // If the cqe doesn't have IORING_CQE_F_MORE set, then this task is complete and free to
+                // be rescheduled
+                task.state = .complete;
+                self.in_flight.remove(task);
+                rt.free_q.push(task);
+            }
         }
+
+        try task.callback(rt, task.*);
     }
 }
 

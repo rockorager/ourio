@@ -57,6 +57,9 @@ Say we `accept` a connection in one thread, and want to send the file descriptor
 to another for handling.
 
 ```zig
+// Spawn a thread with a queue of 16 entries. When this function returns, the
+// the thread is idle and waiting to receive tasks via msgRing
+const thread = main_rt.spawnThread(16);
 const target_task = try main_rt.getTask();
 target_task.* {
     .userdata = &foo,
@@ -65,11 +68,12 @@ target_task.* {
     .req = .{ .userfd = fd },
 };
 
-// Send target_task from the main_rt thread to the thread_rt Ring. The
+// Send target_task from the main_rt thread to the thread Ring. The
 // thread_rt Ring will then // process the task as a completion, ie
-// Worker.onCompletion will be called with // this task. That thread can then
-// schedule a recv, a write, etc on the file // descriptor it just received.
-_ = try main_rt.msgRing(thread_rt, target_task, .{});
+// Worker.onCompletion will be called with this task. That thread can then
+// schedule a recv, a write, etc on the file descriptor it just received. Or do
+// arbitrary work
+_ = try main_rt.msgRing(&thread.ring, target_task, .{});
 ```
 
 ### Multiple Rings on the same thread
@@ -84,6 +88,7 @@ _ = try rt2.poll(fd, .{
     .cb = onCompletion, 
     .msg = @intFromEnum(Msg.rt1_has_completions)}
 );
+
 ```
 
 ## Example

@@ -394,6 +394,70 @@ pub const Ring = struct {
         self.submission_q.push(task);
         return task;
     }
+
+    /// Spawns a thread with a Ring instance. The thread will be idle and waiting to receive work
+    /// via msgRing when this function returns. Call kill on the returned thread to signal it to
+    /// shutdown.
+    pub fn spawnThread(self: *Ring, entries: u16) !*Thread {
+        const thread = try self.gpa.create(Thread);
+        errdefer self.gpa.destroy(thread);
+
+        var wg: std.Thread.WaitGroup = .{};
+        wg.start();
+        thread.thread = try std.Thread.spawn(.{}, Thread.run, .{ thread, self, &wg, entries });
+        wg.wait();
+
+        return thread;
+    }
+};
+
+pub const Thread = struct {
+    thread: std.Thread,
+    ring: io.Ring = undefined,
+
+    pub const Msg = enum {
+        kill,
+    };
+
+    pub fn run(self: *Thread, parent: *io.Ring, wg: *std.Thread.WaitGroup, entries: u16) !void {
+        self.ring = try parent.initChild(entries);
+        wg.finish();
+
+        defer self.ring.deinit();
+
+        // Run forever, because we may not start with a task. Inter-thread messaging means we could
+        // receive work at any time
+        self.ring.run(.forever) catch |err| {
+            switch (err) {
+                error.ThreadKilled => return,
+                else => return err,
+            }
+        };
+    }
+
+    /// Kill sends a message to the thread telling it to exit. Callers of this thread can safely
+    /// join and deinit the Thread in the Context callback
+    pub fn kill(self: *Thread, rt: *io.Ring, ctx: Context) Allocator.Error!*io.Task {
+        const target_task = try rt.getTask();
+        target_task.* = .{
+            .userdata = self,
+            .msg = @intFromEnum(Thread.Msg.kill),
+            .callback = Thread.onCompletion,
+            .result = .noop,
+        };
+
+        return rt.msgRing(&self.ring, target_task, ctx);
+    }
+
+    pub fn join(self: Thread) void {
+        self.thread.join();
+    }
+
+    fn onCompletion(_: *io.Ring, task: Task) anyerror!void {
+        switch (task.msgToEnum(Thread.Msg)) {
+            .kill => return error.ThreadKilled,
+        }
+    }
 };
 
 pub const Op = enum {
@@ -714,4 +778,59 @@ test "runtime: msgRing" {
     try rt2.run(.until_done);
     try std.testing.expect(foo.rt1);
     try std.testing.expect(foo.rt2);
+}
+
+test "runtime: spawnThread" {
+    const gpa = std.testing.allocator;
+    var rt = try io.Ring.init(gpa, 16);
+    defer rt.deinit();
+
+    const thread = try rt.spawnThread(4);
+
+    const Foo2 = struct {
+        kill: bool = false,
+        did_work: bool = false,
+
+        gpa: Allocator,
+        thread: *Thread,
+
+        const Msg = enum { kill, work };
+
+        fn callback(_: *io.Ring, task: io.Task) anyerror!void {
+            const self = task.userdataCast(@This());
+            const msg = task.msgToEnum(Msg);
+            switch (msg) {
+                .kill => {
+                    self.kill = true;
+                    self.thread.join();
+                    self.gpa.destroy(self.thread);
+                },
+                .work => self.did_work = true,
+            }
+        }
+    };
+
+    var foo: Foo2 = .{ .thread = thread, .gpa = gpa };
+
+    // Send work to the thread
+    const target_task = try rt.getTask();
+    target_task.* = .{
+        .userdata = &foo,
+        .callback = Foo2.callback,
+        .msg = @intFromEnum(Foo2.Msg.work),
+        .result = .{ .usermsg = 0 },
+    };
+
+    _ = try rt.msgRing(&thread.ring, target_task, .{});
+
+    try rt.run(.until_done);
+    _ = try thread.kill(&rt, .{
+        .ptr = &foo,
+        .cb = Foo2.callback,
+        .msg = @intFromEnum(Foo2.Msg.kill),
+    });
+    try rt.run(.until_done);
+
+    try std.testing.expect(foo.did_work);
+    try std.testing.expect(foo.kill);
 }
