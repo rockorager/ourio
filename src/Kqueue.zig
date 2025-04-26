@@ -358,6 +358,48 @@ fn prepTask(self: *Kqueue, task: *io.Task) !void {
                 task.result = .{ .socket = error.Unexpected };
         },
 
+        .statx => |*req| {
+            self.synchronous_queue.push(task);
+
+            if (posix.fstatat(posix.AT.FDCWD, req.path, 0)) |stat| {
+                req.result.* = .{
+                    .mask = 0,
+                    .blksize = @intCast(stat.blksize),
+                    .attributes = 0,
+                    .nlink = @intCast(stat.nlink),
+                    .uid = @intCast(stat.uid),
+                    .gid = @intCast(stat.gid),
+                    .mode = @intCast(stat.mode),
+                    .__pad1 = 0,
+                    .ino = @intCast(stat.ino),
+                    .size = @intCast(stat.size),
+                    .blocks = @intCast(stat.blocks),
+                    .attributes_mask = 0,
+                    .atime = .{
+                        .sec = @intCast(stat.atime().sec),
+                        .nsec = @intCast(stat.atime().nsec),
+                    },
+                    .btime = .{
+                        .sec = 0,
+                        .nsec = 0,
+                    },
+                    .ctime = .{
+                        .sec = @intCast(stat.ctime().sec),
+                        .nsec = @intCast(stat.ctime().nsec),
+                    },
+                    .mtime = .{
+                        .sec = @intCast(stat.mtime().sec),
+                        .nsec = @intCast(stat.mtime().nsec),
+                    },
+                    .rdev_major = major(@intCast(stat.rdev)),
+                    .rdev_minor = minor(@intCast(stat.rdev)),
+                    .dev_major = major(@intCast(stat.dev)),
+                    .dev_minor = major(@intCast(stat.dev)),
+                    .__pad2 = undefined,
+                };
+            } else |_| task.result = .{ .statx = error.Unexpected };
+        },
+
         .timer => {
             const now = std.time.milliTimestamp();
             try self.addTimer(.{ .timeout = .{ .task = task, .added_ms = now } });
@@ -392,6 +434,7 @@ fn cancelTask(self: *Kqueue, task: *io.Task) !void {
         .msg_ring,
         .noop,
         .socket,
+        .statx,
         .userfd,
         .usermsg,
         .userptr,
@@ -624,6 +667,7 @@ fn handleSynchronousCompletion(
         .msg_ring,
         .noop,
         .socket,
+        .statx,
         .userfd,
         .usermsg,
         .userptr,
@@ -658,6 +702,7 @@ fn handleSynchronousCompletion(
                         .poll => .{ .poll = error.Canceled },
                         .recv => .{ .recv = error.Canceled },
                         .socket => .{ .socket = error.Canceled },
+                        .statx => .{ .statx = error.Canceled },
                         .timer => .{ .timer = error.Canceled },
                         .userfd, .usermsg, .userptr => unreachable,
                         .write => .{ .write = error.Canceled },
@@ -696,6 +741,7 @@ fn handleCompletion(
         .msg_ring,
         .noop,
         .socket,
+        .statx,
         .timer,
         .userfd,
         .usermsg,
@@ -822,4 +868,22 @@ fn handleExpiredTimer(self: *Kqueue, rt: *io.Ring, t: Timer) !void {
             try task.callback(rt, task.*);
         },
     }
+}
+fn major(dev: u64) u32 {
+    return switch (@import("builtin").target.os.tag) {
+        .macos, .visionos, .tvos, .ios, .watchos => @intCast((dev >> 24) & 0xff),
+        .freebsd, .openbsd, .netbsd, .dragonfly => @intCast((dev >> 8) & 0xff),
+        else => @compileError("unsupported OS for major()"),
+    };
+}
+
+fn minor(dev: u64) u32 {
+    return switch (@import("builtin").target.os.tag) {
+        .macos, .ios, .visionos, .tvos, .watchos => @intCast(dev & 0xffffff),
+        .openbsd => @intCast(dev & 0xff),
+        .freebsd => @intCast((dev & 0xff) | ((dev >> 12) & 0xfff00)),
+        .dragonfly => @intCast((dev & 0xff) | ((dev >> 12) & 0xfff00)),
+        .netbsd => @intCast((dev & 0xff) | ((dev >> 12) & 0xfff00)),
+        else => @compileError("unsupported OS for minor()"),
+    };
 }

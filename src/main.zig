@@ -395,6 +395,24 @@ pub const Ring = struct {
         return task;
     }
 
+    pub fn stat(
+        self: *Ring,
+        path: [:0]const u8,
+        result: *Statx,
+        ctx: Context,
+    ) Allocator.Error!*Task {
+        const task = try self.getTask();
+        task.* = .{
+            .userdata = ctx.ptr,
+            .msg = ctx.msg,
+            .callback = ctx.cb,
+            .req = .{ .statx = .{ .path = path, .result = result } },
+        };
+
+        self.submission_q.push(task);
+        return task;
+    }
+
     /// Spawns a thread with a Ring instance. The thread will be idle and waiting to receive work
     /// via msgRing when this function returns. Call kill on the returned thread to signal it to
     /// shutdown.
@@ -474,6 +492,7 @@ pub const Op = enum {
     poll,
     socket,
     connect,
+    statx,
 
     /// userfd is meant to send file descriptors between Ring instances (using msgRing)
     userfd,
@@ -523,6 +542,10 @@ pub const Request = union(Op) {
         addr: *posix.sockaddr,
         addr_len: posix.socklen_t,
     },
+    statx: struct {
+        path: [:0]const u8,
+        result: *Statx, // this will be filled in by the op
+    },
 
     userfd,
     usermsg,
@@ -543,6 +566,7 @@ pub const Result = union(Op) {
     poll: ResultError!void,
     socket: ResultError!posix.fd_t,
     connect: ResultError!void,
+    statx: ResultError!*Statx,
 
     userfd: anyerror!posix.fd_t,
     usermsg: u16,
@@ -588,6 +612,95 @@ const Foo = struct {
     fn callback(_: *io.Ring, task: io.Task) anyerror!void {
         const self = task.userdataCast(Foo);
         self.bar += 1;
+    }
+};
+
+/// Follows the ABI of linux statx. Not all platforms will contain all information, or may contain
+/// more information than requested
+pub const Statx = extern struct {
+    /// Mask of bits indicating filled fields
+    mask: u32,
+
+    /// Block size for filesystem I/O
+    blksize: u32,
+
+    /// Extra file attribute indicators
+    attributes: u64,
+
+    /// Number of hard links
+    nlink: u32,
+
+    /// User ID of owner
+    uid: posix.uid_t,
+
+    /// Group ID of owner
+    gid: posix.gid_t,
+
+    /// File type and mode
+    mode: u16,
+    __pad1: u16,
+
+    /// Inode number
+    ino: u64,
+
+    /// Total size in bytes
+    size: u64,
+
+    /// Number of 512B blocks allocated
+    blocks: u64,
+
+    /// Mask to show what's supported in `attributes`.
+    attributes_mask: u64,
+
+    /// Last access file timestamp
+    atime: Timestamp,
+
+    /// Creation file timestamp
+    btime: Timestamp,
+
+    /// Last status change file timestamp
+    ctime: Timestamp,
+
+    /// Last modification file timestamp
+    mtime: Timestamp,
+
+    /// Major ID, if this file represents a device.
+    rdev_major: u32,
+
+    /// Minor ID, if this file represents a device.
+    rdev_minor: u32,
+
+    /// Major ID of the device containing the filesystem where this file resides.
+    dev_major: u32,
+
+    /// Minor ID of the device containing the filesystem where this file resides.
+    dev_minor: u32,
+
+    __pad2: [14]u64,
+
+    pub const Timestamp = extern struct {
+        sec: i64,
+        nsec: u32,
+        __pad: u32 = 0,
+    };
+
+    pub fn major(dev: u64) u32 {
+        return switch (@import("builtin").target.os.tag) {
+            .macos, .visionos, .tvos, .ios, .watchos => @intCast((dev >> 24) & 0xff),
+            .freebsd, .openbsd, .netbsd, .dragonfly => @intCast((dev >> 8) & 0xff),
+            else => @compileError("unsupported OS for major()"),
+        };
+    }
+
+    pub fn minor(dev: u64) u32 {
+        return switch (@import("builtin").target.os.tag) {
+            .macos, .ios, .visionos, .tvos, .watchos => @intCast(dev & 0xffffff),
+            .openbsd => @intCast(dev & 0xff),
+            .freebsd => @intCast((dev & 0xff) | ((dev >> 12) & 0xfff00)),
+            .dragonfly => @intCast((dev & 0xff) | ((dev >> 12) & 0xfff00)),
+            .netbsd => @intCast((dev & 0xff) | ((dev >> 12) & 0xfff00)),
+            else => @compileError("unsupported OS for minor()"),
+        };
     }
 };
 
@@ -833,4 +946,19 @@ test "runtime: spawnThread" {
 
     try std.testing.expect(foo.did_work);
     try std.testing.expect(foo.kill);
+}
+
+test "runtime: stat" {
+    const gpa = std.testing.allocator;
+    var rt = try io.Ring.init(gpa, 16);
+    defer rt.deinit();
+
+    var foo: Foo = .{};
+    const ctx: Context = .{ .ptr = &foo, .cb = Foo.callback };
+
+    var statx: Statx = undefined;
+    const task = try rt.stat("build.zig", &statx, ctx);
+
+    try rt.run(.until_done);
+    try std.testing.expect(task.result != null);
 }
