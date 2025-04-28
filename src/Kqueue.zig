@@ -403,6 +403,7 @@ fn prepTask(self: *Kqueue, task: *io.Task) !void {
                     .dev_minor = major(@intCast(stat.dev)),
                     .__pad2 = undefined,
                 };
+                task.result = .{ .statx = req.result };
             } else |_| task.result = .{ .statx = error.Unexpected };
         },
 
