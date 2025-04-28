@@ -225,6 +225,13 @@ fn prepTask(self: *Uring, task: *io.Task) void {
             self.prepDeadline(task, sqe);
         },
 
+        .readv => |req| {
+            const sqe = self.getSqe();
+            sqe.prep_readv(req.fd, req.vecs, 0);
+            sqe.user_data = @intFromPtr(task);
+            self.prepDeadline(task, sqe);
+        },
+
         // user* is only sent internally between rings and higher level wrappers
         .userfd, .usermsg, .userptr => unreachable,
     }
@@ -349,6 +356,13 @@ pub fn reapCompletions(self: *Uring, rt: *io.Ring) anyerror!void {
 
             .statx => |req| .{ .statx = switch (cqeToE(cqe.res)) {
                 .SUCCESS => req.result,
+                .INVAL => io.ResultError.Invalid,
+                .CANCELED => io.ResultError.Canceled,
+                else => |e| unexpectedError(e),
+            } },
+
+            .readv => .{ .readv = switch (cqeToE(cqe.res)) {
+                .SUCCESS => @intCast(cqe.res),
                 .INVAL => io.ResultError.Invalid,
                 .CANCELED => io.ResultError.Canceled,
                 else => |e| unexpectedError(e),

@@ -344,6 +344,12 @@ fn prepTask(self: *Kqueue, task: *io.Task) !void {
             }
         },
 
+        .readv => |req| {
+            self.in_flight.push(task);
+            const kevent = evSet(@intCast(req.fd), EVFILT.READ, EV.ADD | EV.ONESHOT, task);
+            try self.submission_queue.append(self.gpa, kevent);
+        },
+
         .recv => |req| {
             self.in_flight.push(task);
             const kevent = evSet(@intCast(req.fd), EVFILT.READ, EV.ADD | EV.ONESHOT, task);
@@ -485,6 +491,18 @@ fn cancelTask(self: *Kqueue, task: *io.Task) !void {
                 const kevent = evSet(@intCast(cancel_req.fd), EVFILT.WRITE, EV.DELETE, task);
                 try self.submission_queue.append(self.gpa, kevent);
             }
+        },
+
+        .readv => |cancel_req| {
+            self.in_flight.remove(task);
+            task.result = .{ .readv = error.Canceled };
+            const kevent = evSet(
+                @intCast(cancel_req.fd),
+                EVFILT.READ,
+                EV.DELETE,
+                task,
+            );
+            try self.submission_queue.append(self.gpa, kevent);
         },
 
         .recv => |cancel_req| {
@@ -654,6 +672,7 @@ fn handleSynchronousCompletion(
         // async tasks. These can be handled synchronously in a cancel all
         .accept,
         .poll,
+        .readv,
         .recv,
         .write,
         .writev,
@@ -700,6 +719,7 @@ fn handleSynchronousCompletion(
                         .msg_ring => .{ .msg_ring = error.Canceled },
                         .noop => unreachable,
                         .poll => .{ .poll = error.Canceled },
+                        .readv => .{ .readv = error.Canceled },
                         .recv => .{ .recv = error.Canceled },
                         .socket => .{ .socket = error.Canceled },
                         .statx => .{ .statx = error.Canceled },
@@ -783,6 +803,22 @@ fn handleCompletion(
                 const err = unexpectedError(dataToE(event.data));
                 task.result = .{ .poll = err };
             } else task.result = .{ .poll = {} };
+            return task.callback(rt, task.*);
+        },
+
+        .readv => |req| {
+            defer self.releaseTask(rt, task);
+            self.in_flight.remove(task);
+            if (event.flags & EV.ERROR != 0) {
+                // Interpret data as an errno
+                const err = unexpectedError(dataToE(event.data));
+                task.result = .{ .readv = err };
+                return task.callback(rt, task.*);
+            }
+            if (posix.readv(req.fd, req.vecs)) |n|
+                task.result = .{ .readv = n }
+            else |_|
+                task.result = .{ .readv = error.Unexpected };
             return task.callback(rt, task.*);
         },
 
