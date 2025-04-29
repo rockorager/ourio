@@ -3,7 +3,7 @@ const Kqueue = @This();
 const std = @import("std");
 const builtin = @import("builtin");
 
-const io = @import("main.zig");
+const io = @import("../ourio.zig");
 
 const Allocator = std.mem.Allocator;
 const EV = std.c.EV;

@@ -2,8 +2,8 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 const Allocator = std.mem.Allocator;
-pub const Mock = @import("Mock.zig");
-const Queue = @import("queue.zig").Intrusive;
+pub const Mock = @import("ourio/Mock.zig");
+const Queue = @import("ourio/queue.zig").Intrusive;
 const io = @This();
 const posix = std.posix;
 
@@ -23,7 +23,7 @@ pub const has_kqueue = switch (builtin.os.tag) {
 };
 pub const has_io_uring = builtin.os.tag == .linux;
 
-pub const Task = @import("Task.zig");
+pub const Task = @import("ourio/Task.zig");
 pub const Callback = *const fn (*Ring, Task) anyerror!void;
 pub fn noopCallback(_: *Ring, _: Task) anyerror!void {}
 
@@ -63,9 +63,9 @@ pub const Backend = union(enum) {
         .tvos,
         .visionos,
         .watchos,
-        => @import("Kqueue.zig"),
+        => @import("ourio/Kqueue.zig"),
 
-        .linux => @import("Uring.zig"),
+        .linux => @import("ourio/Uring.zig"),
 
         else => @compileError("unsupported os"),
     },
@@ -601,14 +601,11 @@ pub const RecvError = ResultError || error{
 };
 
 test {
-    _ = @import("net.zig");
-    _ = @import("queue.zig");
-    _ = @import("tls.zig");
+    _ = @import("ourio/Mock.zig");
+    _ = @import("ourio/queue.zig");
 
-    _ = @import("Mock.zig");
-
-    if (has_io_uring) _ = @import("Uring.zig");
-    if (has_kqueue) _ = @import("Kqueue.zig");
+    if (has_io_uring) _ = @import("ourio/Uring.zig");
+    if (has_kqueue) _ = @import("ourio/Kqueue.zig");
 }
 
 /// Foo is only for testing

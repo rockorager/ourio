@@ -1,5 +1,5 @@
 const std = @import("std");
-const io = @import("main.zig");
+const io = @import("ourio");
 
 const posix = std.posix;
 const Allocator = std.mem.Allocator;

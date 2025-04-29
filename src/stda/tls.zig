@@ -1,6 +1,6 @@
 const std = @import("std");
 const tls = @import("tls");
-const io = @import("main.zig");
+const io = @import("ourio");
 
 const Allocator = std.mem.Allocator;
 const CertBundle = tls.config.cert.Bundle;

@@ -2,7 +2,7 @@ const Mock = @This();
 
 const std = @import("std");
 
-const io = @import("main.zig");
+const io = @import("../ourio.zig");
 
 const Allocator = std.mem.Allocator;
 const Queue = @import("queue.zig").Intrusive;

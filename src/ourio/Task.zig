@@ -1,7 +1,7 @@
 const Task = @This();
 
 const std = @import("std");
-const io = @import("main.zig");
+const io = @import("../ourio.zig");
 
 const Allocator = std.mem.Allocator;
 const Ring = io.Ring;
