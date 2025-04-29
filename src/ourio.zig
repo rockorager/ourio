@@ -413,6 +413,48 @@ pub const Ring = struct {
         return task;
     }
 
+    pub fn readv(
+        self: *Ring,
+        fd: posix.fd_t,
+        vecs: []const posix.iovec,
+        ctx: Context,
+    ) Allocator.Error!*Task {
+        const task = try self.getTask();
+        task.* = .{
+            .userdata = ctx.ptr,
+            .msg = ctx.msg,
+            .callback = ctx.cb,
+            .req = .{ .readv = .{
+                .fd = fd,
+                .vecs = vecs,
+            } },
+        };
+
+        self.submission_q.push(task);
+        return task;
+    }
+
+    pub fn read(
+        self: *Ring,
+        fd: posix.fd_t,
+        buffer: []u8,
+        ctx: Context,
+    ) Allocator.Error!*Task {
+        const task = try self.getTask();
+        task.* = .{
+            .userdata = ctx.ptr,
+            .msg = ctx.msg,
+            .callback = ctx.cb,
+            .req = .{ .read = .{
+                .fd = fd,
+                .buffer = buffer,
+            } },
+        };
+
+        self.submission_q.push(task);
+        return task;
+    }
+
     pub fn open(
         self: *Ring,
         path: [:0]const u8,
@@ -514,6 +556,7 @@ pub const Op = enum {
     statx,
     readv,
     open,
+    read,
 
     /// userfd is meant to send file descriptors between Ring instances (using msgRing)
     userfd,
@@ -576,6 +619,10 @@ pub const Request = union(Op) {
         flags: posix.O,
         mode: posix.mode_t,
     },
+    read: struct {
+        fd: posix.fd_t,
+        buffer: []u8,
+    },
 
     userfd,
     usermsg,
@@ -599,6 +646,7 @@ pub const Result = union(Op) {
     statx: ResultError!*Statx,
     readv: ResultError!usize,
     open: ResultError!posix.fd_t,
+    read: ResultError!usize,
 
     userfd: anyerror!posix.fd_t,
     usermsg: u16,
