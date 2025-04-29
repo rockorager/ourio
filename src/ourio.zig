@@ -413,6 +413,25 @@ pub const Ring = struct {
         return task;
     }
 
+    pub fn open(
+        self: *Ring,
+        path: [:0]const u8,
+        flags: posix.O,
+        mode: posix.mode_t,
+        ctx: Context,
+    ) Allocator.Error!*Task {
+        const task = try self.getTask();
+        task.* = .{
+            .userdata = ctx.ptr,
+            .msg = ctx.msg,
+            .callback = ctx.cb,
+            .req = .{ .open = .{ .path = path, .flags = flags, .mode = mode } },
+        };
+
+        self.submission_q.push(task);
+        return task;
+    }
+
     /// Spawns a thread with a Ring instance. The thread will be idle and waiting to receive work
     /// via msgRing when this function returns. Call kill on the returned thread to signal it to
     /// shutdown.
