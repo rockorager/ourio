@@ -494,6 +494,7 @@ pub const Op = enum {
     connect,
     statx,
     readv,
+    open,
 
     /// userfd is meant to send file descriptors between Ring instances (using msgRing)
     userfd,
@@ -551,6 +552,11 @@ pub const Request = union(Op) {
         fd: posix.fd_t,
         vecs: []const posix.iovec,
     },
+    open: struct {
+        path: [:0]const u8,
+        flags: posix.O,
+        mode: posix.mode_t,
+    },
 
     userfd,
     usermsg,
@@ -573,6 +579,7 @@ pub const Result = union(Op) {
     connect: ResultError!void,
     statx: ResultError!*Statx,
     readv: ResultError!usize,
+    open: ResultError!posix.fd_t,
 
     userfd: anyerror!posix.fd_t,
     usermsg: u16,

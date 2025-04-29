@@ -332,6 +332,14 @@ fn prepTask(self: *Kqueue, task: *io.Task) !void {
             self.synchronous_queue.push(task);
         },
 
+        .open => |req| {
+            self.synchronous_queue.push(task);
+
+            if (posix.open(req.path, req.flags, req.mode)) |fd| {
+                task.result = .{ .open = fd };
+            } else |_| task.result = .{ .open = error.Unexpected };
+        },
+
         .poll => |req| {
             self.in_flight.push(task);
             if (req.mask & posix.POLL.IN != 0) {
@@ -440,6 +448,7 @@ fn cancelTask(self: *Kqueue, task: *io.Task) !void {
         .close,
         .msg_ring,
         .noop,
+        .open,
         .socket,
         .statx,
         .userfd,
@@ -686,6 +695,7 @@ fn handleSynchronousCompletion(
         .close,
         .msg_ring,
         .noop,
+        .open,
         .socket,
         .statx,
         .userfd,
@@ -719,6 +729,7 @@ fn handleSynchronousCompletion(
                         .deadline => .{ .deadline = error.Canceled },
                         .msg_ring => .{ .msg_ring = error.Canceled },
                         .noop => unreachable,
+                        .open => .{ .open = error.Canceled },
                         .poll => .{ .poll = error.Canceled },
                         .readv => .{ .readv = error.Canceled },
                         .recv => .{ .recv = error.Canceled },
@@ -761,6 +772,7 @@ fn handleCompletion(
         .deadline,
         .msg_ring,
         .noop,
+        .open,
         .socket,
         .statx,
         .timer,
