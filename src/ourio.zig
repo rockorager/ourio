@@ -558,6 +558,8 @@ pub const Op = enum {
     open,
     read,
 
+    /// userbytes is meant to send slices of bytes between Ring instances or callbacks
+    userbytes,
     /// userfd is meant to send file descriptors between Ring instances (using msgRing)
     userfd,
     /// usermsg is meant to send a u16 between runtime instances (using msgRing)
@@ -624,6 +626,7 @@ pub const Request = union(Op) {
         buffer: []u8,
     },
 
+    userbytes,
     userfd,
     usermsg,
     userptr,
@@ -648,6 +651,7 @@ pub const Result = union(Op) {
     open: ResultError!posix.fd_t,
     read: ResultError!usize,
 
+    userbytes: anyerror![]const u8,
     userfd: anyerror!posix.fd_t,
     usermsg: u16,
     userptr: anyerror!?*anyopaque,

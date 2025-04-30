@@ -7,6 +7,8 @@ const Uri = std.Uri;
 
 const assert = std.debug.assert;
 
+pub const dns = @import("net/dns.zig");
+
 pub fn tcpConnectToHost(
     rt: *io.Ring,
     host: []const u8,
@@ -35,7 +37,6 @@ pub fn tcpConnectToAddr(
 
     conn.* = .{
         .ctx = ctx,
-
         .addr = addr,
         .fd = null,
         .task = undefined,
@@ -45,6 +46,31 @@ pub fn tcpConnectToAddr(
         conn.addr.any.family,
         posix.SOCK.STREAM | posix.SOCK.CLOEXEC,
         posix.IPPROTO.TCP,
+        .{ .ptr = conn, .msg = @intFromEnum(ConnectTask.Msg.socket), .cb = ConnectTask.handleMsg },
+    );
+
+    return conn;
+}
+
+pub fn udpConnectToAddr(
+    rt: *io.Ring,
+    addr: std.net.Address,
+    ctx: io.Context,
+) Allocator.Error!*ConnectTask {
+    const conn = try rt.gpa.create(ConnectTask);
+    errdefer rt.gpa.destroy(conn);
+
+    conn.* = .{
+        .ctx = ctx,
+        .addr = addr,
+        .fd = null,
+        .task = undefined,
+    };
+
+    conn.task = try rt.socket(
+        conn.addr.any.family,
+        posix.SOCK.DGRAM | posix.SOCK.CLOEXEC,
+        posix.IPPROTO.UDP,
         .{ .ptr = conn, .msg = @intFromEnum(ConnectTask.Msg.socket), .cb = ConnectTask.handleMsg },
     );
 
@@ -125,6 +151,10 @@ pub const ConnectTask = struct {
         }
     }
 };
+
+test {
+    _ = dns;
+}
 
 test "tcp connect" {
     var rt: io.Ring = try .init(std.testing.allocator, 16);

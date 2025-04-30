@@ -247,7 +247,7 @@ fn prepTask(self: *Uring, task: *io.Task) void {
         },
 
         // user* is only sent internally between rings and higher level wrappers
-        .userfd, .usermsg, .userptr => unreachable,
+        .userbytes, .userfd, .usermsg, .userptr => unreachable,
     }
 }
 
@@ -399,7 +399,7 @@ pub fn reapCompletions(self: *Uring, rt: *io.Ring) anyerror!void {
             .usermsg => .{ .usermsg = @intCast(cqe.res) },
 
             // userfd should never reach the runtime
-            .userfd, .userptr => unreachable,
+            .userbytes, .userfd, .userptr => unreachable,
         };
 
         defer {

@@ -41,9 +41,10 @@ pub fn setupStdaMod(b: *std.Build, target: Target, optimize: OptimizeMode, ourio
         .target = target,
         .optimize = optimize,
     });
+    stda_mod.addImport("ourio", ourio);
+
     const tls_dep = b.dependency("tls", .{ .target = target, .optimize = optimize });
     stda_mod.addImport("tls", tls_dep.module("tls"));
-    stda_mod.addImport("ourio", ourio);
 
     return stda_mod;
 }

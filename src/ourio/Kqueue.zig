@@ -427,7 +427,7 @@ fn prepTask(self: *Kqueue, task: *io.Task) !void {
         },
 
         // user* fields are never seen by the runtime, only for internal message passing
-        .userfd, .usermsg, .userptr => unreachable,
+        .userbytes, .userfd, .usermsg, .userptr => unreachable,
 
         .write => |req| {
             self.in_flight.push(task);
@@ -457,6 +457,7 @@ fn cancelTask(self: *Kqueue, task: *io.Task) !void {
         .open,
         .socket,
         .statx,
+        .userbytes,
         .userfd,
         .usermsg,
         .userptr,
@@ -717,6 +718,7 @@ fn handleSynchronousCompletion(
         .open,
         .socket,
         .statx,
+        .userbytes,
         .userfd,
         .usermsg,
         .userptr,
@@ -756,7 +758,7 @@ fn handleSynchronousCompletion(
                         .socket => .{ .socket = error.Canceled },
                         .statx => .{ .statx = error.Canceled },
                         .timer => .{ .timer = error.Canceled },
-                        .userfd, .usermsg, .userptr => unreachable,
+                        .userbytes, .userfd, .usermsg, .userptr => unreachable,
                         .write => .{ .write = error.Canceled },
                         .writev => .{ .writev = error.Canceled },
                     };
@@ -796,6 +798,7 @@ fn handleCompletion(
         .socket,
         .statx,
         .timer,
+        .userbytes,
         .userfd,
         .usermsg,
         .userptr,

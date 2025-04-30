@@ -30,6 +30,7 @@ timer_cb: ?*const fn (*io.Task) io.Result = null,
 write_cb: ?*const fn (*io.Task) io.Result = null,
 writev_cb: ?*const fn (*io.Task) io.Result = null,
 
+userbytes_cb: ?*const fn (*io.Task) io.Result = null,
 userfd_cb: ?*const fn (*io.Task) io.Result = null,
 usermsg_cb: ?*const fn (*io.Task) io.Result = null,
 userptr_cb: ?*const fn (*io.Task) io.Result = null,
@@ -117,5 +118,6 @@ pub fn reapCompletions(self: *Mock, rt: *io.Ring) anyerror!void {
     while (self.completions.pop()) |task| {
         try task.callback(rt, task.*);
         rt.free_q.push(task);
+        if (task.deadline) |dl| rt.free_q.push(dl);
     }
 }
