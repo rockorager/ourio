@@ -10,6 +10,7 @@ const assert = std.debug.assert;
 const posix = std.posix;
 
 completions: Queue(io.Task, .complete) = .{},
+open_fds: i64 = 0,
 
 accept_cb: ?*const fn (*io.Task) io.Result = null,
 cancel_cb: ?*const fn (*io.Task) io.Result = null,
@@ -39,6 +40,12 @@ pub fn init(_: u16) !Mock {
 }
 
 pub fn deinit(self: *Mock, _: Allocator) void {
+    if (self.open_fds > 0) {
+        @panic("file descriptor leak");
+    }
+    if (self.open_fds < 0) {
+        @panic("unbalanced file descriptor close");
+    }
     self.* = undefined;
 }
 
@@ -79,12 +86,29 @@ pub fn submit(self: *Mock, queue: *Queue(io.Task, .in_flight)) !void {
             .socket => if (self.socket_cb) |cb| cb(task) else return error.NoMockCallback,
             .statx => if (self.statx_cb) |cb| cb(task) else return error.NoMockCallback,
             .timer => if (self.timer_cb) |cb| cb(task) else return error.NoMockCallback,
+            .userbytes => if (self.userbytes_cb) |cb| cb(task) else return error.NoMockCallback,
             .userfd => if (self.userfd_cb) |cb| cb(task) else return error.NoMockCallback,
             .usermsg => if (self.usermsg_cb) |cb| cb(task) else return error.NoMockCallback,
             .userptr => if (self.userptr_cb) |cb| cb(task) else return error.NoMockCallback,
             .write => if (self.write_cb) |cb| cb(task) else return error.NoMockCallback,
             .writev => if (self.writev_cb) |cb| cb(task) else return error.NoMockCallback,
         };
+
+        switch (task.result.?) {
+            .accept => |accept| {
+                if (accept) |_| self.open_fds += 1 else |_| {}
+            },
+            .open => |open| {
+                if (open) |_| self.open_fds += 1 else |_| {}
+            },
+            .socket => |socket| {
+                if (socket) |_| self.open_fds += 1 else |_| {}
+            },
+            .close => |close| {
+                if (close) |_| self.open_fds -= 1 else |_| {}
+            },
+            else => {},
+        }
         self.completions.push(task);
     }
 }
