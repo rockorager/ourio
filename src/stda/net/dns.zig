@@ -43,12 +43,12 @@ pub const Resolver = struct {
         self.gpa.free(self.config.nameservers);
     }
 
-    pub fn resolveQueries(self: *Resolver, io: *Ring, queries: []const Question, ctx: ourio.Context) !void {
+    pub fn resolveQuery(self: *Resolver, io: *Ring, query: Question, ctx: ourio.Context) !void {
         assert(self.config.nameservers.len > 0);
 
         const conn = try self.gpa.create(Connection);
         conn.* = .{ .gpa = self.gpa, .ctx = ctx, .config = self.config };
-        try conn.writeQuestions(queries);
+        try conn.writeQuestion(query);
 
         try conn.tryNext(io);
     }
@@ -470,22 +470,20 @@ pub const Connection = struct {
         try self.ctx.cb(io, task);
     }
 
-    fn writeQuestions(self: *Connection, queries: []const Question) !void {
-        const header: Header = .{ .question_count = @intCast(queries.len) };
+    fn writeQuestion(self: *Connection, query: Question) !void {
+        const header: Header = .{ .question_count = 1 };
         var writer = self.write_buffer.writer(self.gpa);
         try writer.writeAll(&header.asBytes());
 
-        for (queries) |query| {
-            var iter = std.mem.splitScalar(u8, query.host, '.');
-            while (iter.next()) |val| {
-                const len: u8 = @intCast(val.len);
-                try writer.writeByte(len);
-                try writer.writeAll(val);
-            }
-            try writer.writeByte(0x00);
-            try writer.writeInt(u16, @intFromEnum(query.type), .big);
-            try writer.writeInt(u16, @intFromEnum(query.class), .big);
+        var iter = std.mem.splitScalar(u8, query.host, '.');
+        while (iter.next()) |val| {
+            const len: u8 = @intCast(val.len);
+            try writer.writeByte(len);
+            try writer.writeAll(val);
         }
+        try writer.writeByte(0x00);
+        try writer.writeInt(u16, @intFromEnum(query.type), .big);
+        try writer.writeInt(u16, @intFromEnum(query.class), .big);
     }
 };
 
@@ -549,10 +547,7 @@ test "Resolver" {
 
     try io.run(.until_done);
 
-    try resolver.resolveQueries(&io, &.{
-        .{ .host = "timculverhouse.com" },
-        .{ .host = "timculverhouse.com", .type = .AAAA },
-    }, .{});
+    try resolver.resolveQuery(&io, .{ .host = "timculverhouse.com" }, .{});
     try io.run(.until_done);
     try std.testing.expectEqual(2, resolver.config.nameservers.len);
     try std.testing.expectEqual(3, resolver.config.attempts);
