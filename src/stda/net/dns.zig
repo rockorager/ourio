@@ -250,13 +250,19 @@ pub const ResourceType = enum(u16) {
     // MX = 15,
     // TXT = 16,
     AAAA = 28,
-    // SRV = 33,
+    SRV = 33,
     // OPT = 41,
 };
 
 pub const Answer = union(ResourceType) {
     A: [4]u8,
     AAAA: [16]u8,
+    SRV: struct {
+        priority: u16,
+        weight: u16,
+        port: u16,
+        target: []const u8,
+    },
 };
 
 pub const Response = struct {
@@ -347,6 +353,38 @@ pub const Response = struct {
                         self.bytes[self.offset + 13],
                         self.bytes[self.offset + 14],
                         self.bytes[self.offset + 15],
+                    } };
+                },
+
+                .SRV => {
+                    assert(rd_len > 6);
+                    const rdata = self.bytes[self.offset..];
+                    const priority = std.mem.readInt(u16, rdata[0..2], .big);
+                    const weight = std.mem.readInt(u16, rdata[2..4], .big);
+                    const port = std.mem.readInt(u16, rdata[4..6], .big);
+
+                    var buf: [256]u8 = undefined;
+                    var idx: usize = 0;
+                    var offset: usize = 6;
+                    while (true) {
+                        const len = rdata[offset];
+                        if (len == 0x00) break;
+
+                        if (idx > 0) {
+                            buf[idx] = '.';
+                            idx += 1;
+                        }
+                        offset += 1;
+                        @memcpy(buf[idx .. idx + len], rdata[offset .. offset + len]);
+                        offset += len;
+                        idx += len;
+                    }
+
+                    return .{ .SRV = .{
+                        .priority = priority,
+                        .weight = weight,
+                        .port = port,
+                        .target = buf[0..idx],
                     } };
                 },
             }
