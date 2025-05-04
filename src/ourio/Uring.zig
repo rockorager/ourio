@@ -428,6 +428,6 @@ fn cqeToE(result: i32) std.posix.E {
 }
 
 fn unexpectedError(err: posix.E) posix.UnexpectedError {
-    std.log.err("unexpected posix error: {}", .{err});
+    std.log.debug("unexpected posix error: {}", .{err});
     return error.Unexpected;
 }
