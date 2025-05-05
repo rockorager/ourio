@@ -380,8 +380,9 @@ fn prepTask(self: *Kqueue, task: *io.Task) !void {
 
         .statx => |*req| {
             self.synchronous_queue.push(task);
+            const flags: u32 = if (req.symlink_follow) 0 else posix.AT.SYMLINK_NOFOLLOW;
 
-            if (posix.fstatat(posix.AT.FDCWD, req.path, 0)) |stat| {
+            if (posix.fstatat(posix.AT.FDCWD, req.path, flags)) |stat| {
                 req.result.* = .{
                     .mask = 0,
                     .blksize = @intCast(stat.blksize),

@@ -220,7 +220,14 @@ fn prepTask(self: *Uring, task: *io.Task) void {
 
         .statx => |*req| {
             const sqe = self.getSqe();
-            sqe.prep_statx(linux.AT.FDCWD, req.path, 0, linux.STATX_BASIC_STATS, @ptrCast(req.result));
+            const flags: u32 = if (req.symlink_follow) 0 else linux.AT.SYMLINK_NOFOLLOW;
+            sqe.prep_statx(
+                linux.AT.FDCWD,
+                req.path,
+                flags,
+                linux.STATX_BASIC_STATS,
+                @ptrCast(req.result),
+            );
             sqe.user_data = @intFromPtr(task);
             self.prepDeadline(task, sqe);
         },

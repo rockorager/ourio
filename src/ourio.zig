@@ -413,6 +413,24 @@ pub const Ring = struct {
         return task;
     }
 
+    pub fn lstat(
+        self: *Ring,
+        path: [:0]const u8,
+        result: *Statx,
+        ctx: Context,
+    ) Allocator.Error!*Task {
+        const task = try self.getTask();
+        task.* = .{
+            .userdata = ctx.ptr,
+            .msg = ctx.msg,
+            .callback = ctx.cb,
+            .req = .{ .statx = .{ .path = path, .result = result, .symlink_follow = false } },
+        };
+
+        self.submission_q.push(task);
+        return task;
+    }
+
     pub fn readv(
         self: *Ring,
         fd: posix.fd_t,
@@ -611,6 +629,7 @@ pub const Request = union(Op) {
     statx: struct {
         path: [:0]const u8,
         result: *Statx, // this will be filled in by the op
+        symlink_follow: bool = true,
     },
     readv: struct {
         fd: posix.fd_t,
