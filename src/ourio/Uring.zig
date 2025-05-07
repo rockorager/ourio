@@ -50,7 +50,11 @@ fn supportedFlags() u32 {
         else => return flags,
     }
 
-    const version = std.SemanticVersion.parse(&utsname.version) catch return flags;
+    const release = if (std.mem.indexOfScalar(u8, &utsname.release, '-')) |idx|
+        utsname.release[0..idx]
+    else
+        &utsname.release;
+    const version = std.SemanticVersion.parse(release) catch return flags;
     switch (version.order(.{ .major = 5, .minor = 18, .patch = 0 })) {
         .lt => return flags,
         else => flags |= linux.IORING_SETUP_SUBMIT_ALL,
