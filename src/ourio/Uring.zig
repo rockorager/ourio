@@ -11,13 +11,6 @@ const assert = std.debug.assert;
 const linux = std.os.linux;
 const posix = std.posix;
 
-const common_flags: u32 =
-    linux.IORING_SETUP_SUBMIT_ALL | // Keep submitting events even if one had an error
-    linux.IORING_SETUP_CLAMP | // Clamp entries to system supported max
-    linux.IORING_SETUP_DEFER_TASKRUN | // Defer work until we submit tasks. Requires SINGLE_ISSUER
-    linux.IORING_SETUP_COOP_TASKRUN | // Don't interupt userspace when task is complete
-    linux.IORING_SETUP_SINGLE_ISSUER; // Only a single thread will issue tasks
-
 const msg_ring_received_cqe = 1 << 8;
 
 ring: linux.IoUring,
@@ -27,7 +20,7 @@ eventfd: ?posix.fd_t = null,
 /// Initialize a Ring
 pub fn init(_: Allocator, entries: u16) !Uring {
     var params = std.mem.zeroInit(linux.io_uring_params, .{
-        .flags = common_flags,
+        .flags = supportedFlags(),
         .sq_thread_idle = 1000,
     });
 
@@ -47,10 +40,44 @@ pub fn deinit(self: *Uring, gpa: Allocator) void {
     self.* = undefined;
 }
 
+fn supportedFlags() u32 {
+    // clamp is supported by all kernels that have io_uring
+    var flags: u32 = linux.IORING_SETUP_CLAMP;
+
+    var utsname: linux.utsname = undefined;
+    switch (linux.E.init(linux.uname(&utsname))) {
+        .SUCCESS => {},
+        else => return flags,
+    }
+
+    const version = std.SemanticVersion.parse(&utsname.version) catch return flags;
+    switch (version.order(.{ .major = 5, .minor = 18, .patch = 0 })) {
+        .lt => return flags,
+        else => flags |= linux.IORING_SETUP_SUBMIT_ALL,
+    }
+
+    switch (version.order(.{ .major = 5, .minor = 19, .patch = 0 })) {
+        .lt => return flags,
+        else => flags |= linux.IORING_SETUP_COOP_TASKRUN,
+    }
+
+    switch (version.order(.{ .major = 6, .minor = 0, .patch = 0 })) {
+        .lt => return flags,
+        else => flags |= linux.IORING_SETUP_SINGLE_ISSUER,
+    }
+
+    switch (version.order(.{ .major = 6, .minor = 1, .patch = 0 })) {
+        .lt => return flags,
+        else => flags |= linux.IORING_SETUP_DEFER_TASKRUN,
+    }
+
+    return flags;
+}
+
 /// Initializes a child Ring which can be woken up by self. This must be called from the thread
 /// which will operate the child ring. Initializes with the same queue size as the parent
 pub fn initChild(self: Uring, entries: u16) !Uring {
-    const flags: u32 = common_flags | linux.IORING_SETUP_ATTACH_WQ;
+    const flags: u32 = supportedFlags() | linux.IORING_SETUP_ATTACH_WQ;
 
     var params = std.mem.zeroInit(linux.io_uring_params, .{
         .flags = flags,
