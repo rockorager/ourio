@@ -431,6 +431,8 @@ pub fn reapCompletions(self: *Uring, rt: *io.Ring) anyerror!void {
                 .SUCCESS => @intCast(cqe.res),
                 .INVAL => io.ResultError.Invalid,
                 .CANCELED => io.ResultError.Canceled,
+                .NOTDIR => posix.OpenError.NotDir,
+                .ISDIR => posix.OpenError.IsDir,
                 else => |e| unexpectedError(e),
             } },
 

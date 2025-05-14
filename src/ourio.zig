@@ -667,7 +667,7 @@ pub const Result = union(Op) {
     connect: ResultError!void,
     statx: ResultError!*Statx,
     readv: ResultError!usize,
-    open: ResultError!posix.fd_t,
+    open: OpenError!posix.fd_t,
     read: ResultError!usize,
 
     userbytes: anyerror![]const u8,
@@ -696,6 +696,8 @@ pub const RecvError = ResultError || error{
     /// The entry to cancel couldn't be found
     ConnectionResetByPeer,
 };
+
+pub const OpenError = ResultError || posix.OpenError;
 
 test {
     _ = @import("ourio/Mock.zig");

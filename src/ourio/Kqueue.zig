@@ -334,10 +334,8 @@ fn prepTask(self: *Kqueue, task: *io.Task) !void {
 
         .open => |req| {
             self.synchronous_queue.push(task);
-
-            if (posix.open(req.path, req.flags, req.mode)) |fd| {
-                task.result = .{ .open = fd };
-            } else |_| task.result = .{ .open = error.Unexpected };
+            const rc = posix.open(req.path, req.flags, req.mode);
+            task.result = .{ .open = rc };
         },
 
         .poll => |req| {
