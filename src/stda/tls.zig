@@ -340,7 +340,7 @@ pub const Client = struct {
 
         _ = try rt.write(
             self.fd,
-            self.ciphertext_buf.items.len,
+            self.ciphertext_buf.items,
             .{
                 .ptr = self,
                 .msg = @intFromEnum(Client.Msg.write),
