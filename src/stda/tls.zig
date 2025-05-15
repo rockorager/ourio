@@ -341,9 +341,11 @@ pub const Client = struct {
         _ = try rt.write(
             self.fd,
             self.ciphertext_buf.items.len,
-            self,
-            @intFromEnum(Client.Msg.write),
-            Client.onCompletion,
+            .{
+                .ptr = self,
+                .msg = @intFromEnum(Client.Msg.write),
+                .cb = Client.onCompletion,
+            },
         );
     }
 
