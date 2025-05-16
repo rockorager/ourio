@@ -237,7 +237,7 @@ pub const ResourceType = enum(u16) {
     // NS = 2,
     // MD = 3,
     // MF = 4,
-    // CNAME = 5,
+    CNAME = 5,
     // SOA = 6,
     // MB = 7,
     // MG = 8,
@@ -256,6 +256,7 @@ pub const ResourceType = enum(u16) {
 
 pub const Answer = union(ResourceType) {
     A: [4]u8,
+    CNAME: []const u8,
     AAAA: [16]u8,
     SRV: struct {
         priority: u16,
@@ -307,11 +308,12 @@ pub const Response = struct {
                 self.offset += 2;
             }
 
-            const typ: ResourceType = @enumFromInt(std.mem.readInt(
+            const resource_int = std.mem.readInt(
                 u16,
                 self.bytes[self.offset..][0..2],
                 .big,
-            ));
+            );
+            const typ: ResourceType = @enumFromInt(resource_int);
             self.offset += 2;
             const class = std.mem.readInt(u16, self.bytes[self.offset..][0..2], .big);
             assert(class == 1);
@@ -333,6 +335,8 @@ pub const Response = struct {
                         self.bytes[self.offset + 3],
                     } };
                 },
+
+                .CNAME => return .{ .CNAME = self.bytes[self.offset..][0..rd_len] },
 
                 .AAAA => {
                     assert(rd_len == 4);
