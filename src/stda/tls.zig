@@ -335,7 +335,7 @@ pub const Client = struct {
         try self.ciphertext_buf.ensureUnusedCapacity(gpa, len);
         const slice = self.ciphertext_buf.unusedCapacitySlice();
         const result = try self.tls.encrypt(self.cleartext_buf.items, slice);
-        self.ciphertext_buf.appendSliceAssumeCapacity(result.ciphertext);
+        self.ciphertext_buf.items.len += result.ciphertext.len;
         self.cleartext_buf.replaceRangeAssumeCapacity(0, result.cleartext_pos, "");
 
         _ = try rt.write(
