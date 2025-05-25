@@ -75,7 +75,7 @@ pub const Resolver = struct {
                 const buffer = try self.gpa.alloc(u8, 4096);
                 errdefer self.gpa.free(buffer);
 
-                _ = try io.read(fd, buffer, .{
+                _ = try io.read(fd, buffer, .beginning, .{
                     .cb = Resolver.onCompletion,
                     .ptr = self,
                     .msg = @intFromEnum(Resolver.Msg.read_resolv),
@@ -479,7 +479,7 @@ pub const Connection = struct {
                 });
                 try recv_task.setDeadline(io, .{ .sec = self.deadline });
 
-                const write_task = try io.write(fd, self.write_buffer.items, .{});
+                const write_task = try io.write(fd, self.write_buffer.items, .beginning, .{});
                 try write_task.setDeadline(io, .{ .sec = self.deadline });
             },
 
