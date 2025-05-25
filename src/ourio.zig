@@ -284,6 +284,7 @@ pub const Ring = struct {
         self: *Ring,
         fd: posix.fd_t,
         buffer: []const u8,
+        offset: Offset,
         ctx: Context,
     ) Allocator.Error!*Task {
         const task = try self.getTask();
@@ -294,6 +295,7 @@ pub const Ring = struct {
             .req = .{ .write = .{
                 .fd = fd,
                 .buffer = buffer,
+                .offset = offset,
             } },
         };
 
@@ -305,6 +307,7 @@ pub const Ring = struct {
         self: *Ring,
         fd: posix.fd_t,
         vecs: []const posix.iovec_const,
+        offset: Offset,
         ctx: Context,
     ) Allocator.Error!*Task {
         const task = try self.getTask();
@@ -315,6 +318,7 @@ pub const Ring = struct {
             .req = .{ .writev = .{
                 .fd = fd,
                 .vecs = vecs,
+                .offset = offset,
             } },
         };
 
@@ -435,6 +439,7 @@ pub const Ring = struct {
         self: *Ring,
         fd: posix.fd_t,
         vecs: []const posix.iovec,
+        offset: Offset,
         ctx: Context,
     ) Allocator.Error!*Task {
         const task = try self.getTask();
@@ -445,6 +450,7 @@ pub const Ring = struct {
             .req = .{ .readv = .{
                 .fd = fd,
                 .vecs = vecs,
+                .offset = offset,
             } },
         };
 
@@ -456,6 +462,7 @@ pub const Ring = struct {
         self: *Ring,
         fd: posix.fd_t,
         buffer: []u8,
+        offset: Offset,
         ctx: Context,
     ) Allocator.Error!*Task {
         const task = try self.getTask();
@@ -466,6 +473,7 @@ pub const Ring = struct {
             .req = .{ .read = .{
                 .fd = fd,
                 .buffer = buffer,
+                .offset = offset,
             } },
         };
 
@@ -588,7 +596,7 @@ pub const Op = enum {
 
 pub const Offset = enum(u64) {
     file = @bitCast(@as(i64, -1)),
-    begining = 0,
+    beginning = 0,
     _,
 
     pub fn bytes(n: anytype) Offset {

@@ -112,6 +112,7 @@ pub const Client = struct {
                         self.task = try rt.write(
                             self.fd,
                             self.buffer[0..r.send.len],
+                            .beginning,
                             .{ .ptr = self, .cb = HandshakeTask.handleMsg },
                         );
                         return;
@@ -180,7 +181,7 @@ pub const Client = struct {
 
         const result = try hs.handshake.run("", &hs.buffer);
         const hs_ctx: io.Context = .{ .ptr = hs, .cb = HandshakeTask.handleMsg };
-        hs.task = try rt.write(hs.fd, result.send, hs_ctx);
+        hs.task = try rt.write(hs.fd, result.send, .beginning, hs_ctx);
         return hs;
     }
 
@@ -197,7 +198,7 @@ pub const Client = struct {
         const msg = try self.tls.close(buf);
 
         self.ciphertext_buf.items.len += msg.len;
-        _ = try rt.write(self.fd, self.ciphertext_buf.items[self.written..], .{
+        _ = try rt.write(self.fd, self.ciphertext_buf.items[self.written..], .beginning, .{
             .ptr = self,
             .cb = Client.onCompletion,
             .msg = @intFromEnum(Client.Msg.close_notify),
@@ -261,7 +262,13 @@ pub const Client = struct {
                         .userdata = self.userdata,
                         .msg = self.write_msg,
                         .callback = self.callback,
-                        .req = .{ .write = .{ .fd = self.fd, .buffer = self.ciphertext_buf.items } },
+                        .req = .{
+                            .write = .{
+                                .fd = self.fd,
+                                .buffer = self.ciphertext_buf.items,
+                                .offset = .beginning,
+                            },
+                        },
                         .result = .{ .write = error.Unexpected },
                     });
                 };
@@ -271,6 +278,7 @@ pub const Client = struct {
                     _ = try rt.write(
                         self.fd,
                         self.ciphertext_buf.items[self.written..],
+                        .beginning,
                         self.writeContext(),
                     );
                 } else {
@@ -282,7 +290,13 @@ pub const Client = struct {
                         .userdata = self.userdata,
                         .msg = self.write_msg,
                         .callback = self.callback,
-                        .req = .{ .write = .{ .fd = self.fd, .buffer = self.ciphertext_buf.items } },
+                        .req = .{
+                            .write = .{
+                                .fd = self.fd,
+                                .buffer = self.ciphertext_buf.items,
+                                .offset = .beginning,
+                            },
+                        },
                         .result = .{ .write = self.written },
                     });
                 }
@@ -303,7 +317,7 @@ pub const Client = struct {
                 self.written += n;
 
                 if (self.written < self.ciphertext_buf.items.len) {
-                    _ = try rt.write(self.fd, self.ciphertext_buf.items[self.written..], .{
+                    _ = try rt.write(self.fd, self.ciphertext_buf.items[self.written..], .beginning, .{
                         .ptr = self,
                         .cb = Client.onCompletion,
                         .msg = @intFromEnum(Client.Msg.close_notify),
