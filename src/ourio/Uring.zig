@@ -209,14 +209,14 @@ fn prepTask(self: *Uring, task: *io.Task) void {
 
         .write => |req| {
             const sqe = self.getSqe();
-            sqe.prep_write(req.fd, req.buffer, 0);
+            sqe.prep_write(req.fd, req.buffer, @intFromEnum(req.offset));
             sqe.user_data = @intFromPtr(task);
             self.prepDeadline(task, sqe);
         },
 
         .writev => |req| {
             const sqe = self.getSqe();
-            sqe.prep_writev(req.fd, req.vecs, 0);
+            sqe.prep_writev(req.fd, req.vecs, @intFromEnum(req.offset));
             sqe.user_data = @intFromPtr(task);
             self.prepDeadline(task, sqe);
         },
@@ -265,14 +265,14 @@ fn prepTask(self: *Uring, task: *io.Task) void {
 
         .read => |req| {
             const sqe = self.getSqe();
-            sqe.prep_read(req.fd, req.buffer, 0);
+            sqe.prep_read(req.fd, req.buffer, @intFromEnum(req.offset));
             sqe.user_data = @intFromPtr(task);
             self.prepDeadline(task, sqe);
         },
 
         .readv => |req| {
             const sqe = self.getSqe();
-            sqe.prep_readv(req.fd, req.vecs, 0);
+            sqe.prep_readv(req.fd, req.vecs, @intFromEnum(req.offset));
             sqe.user_data = @intFromPtr(task);
             self.prepDeadline(task, sqe);
         },
