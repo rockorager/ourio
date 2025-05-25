@@ -586,6 +586,16 @@ pub const Op = enum {
     userptr,
 };
 
+pub const Offset = enum(u64) {
+    file = @bitCast(@as(i64, -1)),
+    begining = 0,
+    _,
+
+    pub fn bytes(n: anytype) Offset {
+        return @enumFromInt(n);
+    }
+};
+
 pub const Request = union(Op) {
     noop,
     deadline: Timespec,
@@ -606,10 +616,12 @@ pub const Request = union(Op) {
     write: struct {
         fd: posix.fd_t,
         buffer: []const u8,
+        offset: Offset,
     },
     writev: struct {
         fd: posix.fd_t,
         vecs: []const posix.iovec_const,
+        offset: Offset,
     },
     close: posix.fd_t,
     poll: struct {
@@ -634,6 +646,7 @@ pub const Request = union(Op) {
     readv: struct {
         fd: posix.fd_t,
         vecs: []const posix.iovec,
+        offset: Offset,
     },
     open: struct {
         path: [:0]const u8,
@@ -643,6 +656,7 @@ pub const Request = union(Op) {
     read: struct {
         fd: posix.fd_t,
         buffer: []u8,
+        offset: Offset,
     },
 
     userbytes,
