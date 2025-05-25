@@ -850,7 +850,7 @@ fn handleCompletion(
                 task.result = .{ .read = err };
                 return task.callback(rt, task.*);
             }
-            if (posix.read(req.fd, req.buffer)) |n|
+            if (posix.pread(req.fd, req.buffer, @intFromEnum(req.offset))) |n|
                 task.result = .{ .read = n }
             else |_|
                 task.result = .{ .read = error.Unexpected };
@@ -866,7 +866,7 @@ fn handleCompletion(
                 task.result = .{ .readv = err };
                 return task.callback(rt, task.*);
             }
-            if (posix.readv(req.fd, req.vecs)) |n|
+            if (posix.preadv(req.fd, req.vecs, @intFromEnum(req.offset))) |n|
                 task.result = .{ .readv = n }
             else |_|
                 task.result = .{ .readv = error.Unexpected };
@@ -898,7 +898,7 @@ fn handleCompletion(
                 task.result = .{ .write = err };
                 return task.callback(rt, task.*);
             }
-            if (posix.write(req.fd, req.buffer)) |n|
+            if (posix.pwrite(req.fd, req.buffer, @intFromEnum(req.offset))) |n|
                 task.result = .{ .write = n }
             else |_|
                 task.result = .{ .write = error.Unexpected };
@@ -914,7 +914,7 @@ fn handleCompletion(
                 task.result = .{ .writev = err };
                 return task.callback(rt, task.*);
             }
-            if (posix.writev(req.fd, req.vecs)) |n|
+            if (posix.pwritev(req.fd, req.vecs, @intFromEnum(req.offset))) |n|
                 task.result = .{ .writev = n }
             else |_|
                 task.result = .{ .writev = error.Unexpected };
