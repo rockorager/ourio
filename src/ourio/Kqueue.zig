@@ -465,7 +465,7 @@ fn cancelTask(self: *Kqueue, task: *io.Task) !void {
         .accept => |cancel_req| {
             self.in_flight.remove(task);
             task.result = .{ .accept = error.Canceled };
-            const kevent = evSet(@intCast(cancel_req), EVFILT.READ, EV.DELETE, task);
+            const kevent = evSet(@intCast(cancel_req.fd), EVFILT.READ, EV.DELETE, task);
             try self.submission_queue.append(self.gpa, kevent);
         },
 
