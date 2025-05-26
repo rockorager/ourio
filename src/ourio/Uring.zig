@@ -183,7 +183,7 @@ fn prepTask(self: *Uring, task: *io.Task) void {
 
         .accept => |fd| {
             const sqe = self.getSqe();
-            sqe.prep_multishot_accept(fd, null, null, 0);
+            sqe.prep_accept(fd, null, null, 0);
             sqe.user_data = @intFromPtr(task);
             self.prepDeadline(task, sqe);
         },

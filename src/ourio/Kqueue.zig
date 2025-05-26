@@ -804,7 +804,7 @@ fn handleCompletion(
         => unreachable,
 
         .accept => |req| {
-            // Accept is a multishot request, so we don't remove it from the in_flight queue
+            defer self.releaseTask(rt, task);
             if (event.flags & EV.ERROR != 0) {
                 // Interpret data as an errno
                 const err = unexpectedError(dataToE(event.data));
