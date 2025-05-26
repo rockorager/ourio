@@ -222,7 +222,7 @@ pub const Ring = struct {
         self: *Ring,
         fd: posix.fd_t,
         addr: ?*posix.sockaddr,
-        addr_len: ?*posix.socklen_t,
+        addr_size: ?*posix.socklen_t,
         ctx: Context,
     ) Allocator.Error!*Task {
         const task = try self.getTask();
@@ -230,7 +230,7 @@ pub const Ring = struct {
             .userdata = ctx.ptr,
             .msg = ctx.msg,
             .callback = ctx.cb,
-            .req = .{ .accept = .{ .fd = fd, .addr = addr, .addr_len = addr_len } },
+            .req = .{ .accept = .{ .fd = fd, .addr = addr, .addr_size = addr_size } },
         };
 
         self.submission_q.push(task);
