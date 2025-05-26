@@ -181,9 +181,9 @@ fn prepTask(self: *Uring, task: *io.Task) void {
             self.prepDeadline(task, sqe);
         },
 
-        .accept => |fd| {
+        .accept => |req| {
             const sqe = self.getSqe();
-            sqe.prep_accept(fd, null, null, 0);
+            sqe.prep_accept(req.fd, req.addr, req.addr_size, 0);
             sqe.user_data = @intFromPtr(task);
             self.prepDeadline(task, sqe);
         },

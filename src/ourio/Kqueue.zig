@@ -812,7 +812,7 @@ fn handleCompletion(
                 return task.callback(rt, task.*);
             }
 
-            if (posix.accept(req, null, null, 0)) |fd|
+            if (posix.accept(req.fd, req.addr, req.addr_size, 0)) |fd|
                 task.result = .{ .accept = fd }
             else |_|
                 task.result = .{ .accept = error.Unexpected };

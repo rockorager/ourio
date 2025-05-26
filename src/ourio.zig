@@ -612,7 +612,11 @@ pub const Request = union(Op) {
         all,
         task: *Task,
     },
-    accept: posix.fd_t,
+    accept: struct {
+        fd: posix.fd_t,
+        addr: ?*posix.sockaddr = null,
+        addr_size: ?*posix.socklen_t = null,
+    },
     msg_ring: struct {
         target: *Ring,
         task: *Task,
