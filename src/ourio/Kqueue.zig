@@ -214,7 +214,7 @@ fn prepTask(self: *Kqueue, task: *io.Task) !void {
     return switch (task.req) {
         .accept => |req| {
             self.in_flight.push(task);
-            const kevent = evSet(@intCast(req), EVFILT.READ, EV.ADD, task);
+            const kevent = evSet(@intCast(req.fd), EVFILT.READ, EV.ADD, task);
             try self.submission_queue.append(self.gpa, kevent);
         },
 
