@@ -502,6 +502,35 @@ pub const Ring = struct {
         return task;
     }
 
+    pub fn splice(
+        self: *Ring,
+        fd_in: posix.fd_t,
+        offset: usize,
+        fd_out: posix.fd_t,
+        offset_out: usize,
+        nbytes: usize,
+        ctx: Context,
+    ) Allocator.Error!*Task {
+        const task = try self.getTask();
+        task.* = .{
+            .userdata = ctx.ptr,
+            .msg = ctx.msg,
+            .callback = ctx.cb,
+            .req = .{
+                .splice = .{
+                    .fd_in = fd_in,
+                    .fd_out = fd_out,
+                    .offset = offset,
+                    .offset_out = offset_out,
+                    .nbytes = nbytes,
+                },
+            },
+        };
+
+        self.submission_q.push(task);
+        return task;
+    }
+
     /// Spawns a thread with a Ring instance. The thread will be idle and waiting to receive work
     /// via msgRing when this function returns. Call kill on the returned thread to signal it to
     /// shutdown.
@@ -585,6 +614,7 @@ pub const Op = enum {
     readv,
     open,
     read,
+    splice,
 
     /// userbytes is meant to send slices of bytes between Ring instances or callbacks
     userbytes,
@@ -672,6 +702,13 @@ pub const Request = union(Op) {
         buffer: []u8,
         offset: Offset,
     },
+    splice: struct {
+        fd_in: posix.fd_t,
+        fd_out: posix.fd_t,
+        offset: usize,
+        offset_out: usize,
+        nbytes: usize,
+    },
 
     userbytes,
     userfd,
@@ -697,6 +734,7 @@ pub const Result = union(Op) {
     readv: ResultError!usize,
     open: OpenError!posix.fd_t,
     read: ResultError!usize,
+    splice: ResultError!usize,
 
     userbytes: anyerror![]const u8,
     userfd: anyerror!posix.fd_t,
