@@ -376,6 +376,12 @@ fn prepTask(self: *Kqueue, task: *io.Task) !void {
                 task.result = .{ .socket = error.Unexpected };
         },
 
+        .splice => |req| {
+            self.in_flight.push(task);
+            const kevent = evSet(@intCast(req.fd_in), EVFILT.READ, EV.ADD | EV.ONESHOT, task);
+            try self.submission_queue.append(self.gpa, kevent);
+        },
+
         .statx => |*req| {
             self.synchronous_queue.push(task);
             const flags: u32 = if (req.symlink_follow) 0 else posix.AT.SYMLINK_NOFOLLOW;
@@ -545,6 +551,18 @@ fn cancelTask(self: *Kqueue, task: *io.Task) !void {
             try self.submission_queue.append(self.gpa, kevent);
         },
 
+        .splice => |cancel_req| {
+            self.in_flight.remove(task);
+            task.result = .{ .read = error.Canceled };
+            const kevent = evSet(
+                @intCast(cancel_req.fd_out),
+                EVFILT.READ,
+                EV.DELETE,
+                task,
+            );
+            try self.submission_queue.append(self.gpa, kevent);
+        },
+
         .timer => {
             for (self.timers.items, 0..) |t, i| {
                 if (t == .timeout and t.timeout.task == task) {
@@ -703,6 +721,7 @@ fn handleSynchronousCompletion(
         .read,
         .readv,
         .recv,
+        .splice,
         .write,
         .writev,
 
@@ -755,6 +774,7 @@ fn handleSynchronousCompletion(
                         .readv => .{ .readv = error.Canceled },
                         .recv => .{ .recv = error.Canceled },
                         .socket => .{ .socket = error.Canceled },
+                        .splice => .{ .splice = error.Canceled },
                         .statx => .{ .statx = error.Canceled },
                         .timer => .{ .timer = error.Canceled },
                         .userbytes, .userfd, .usermsg, .userptr => unreachable,
@@ -886,6 +906,22 @@ fn handleCompletion(
                 task.result = .{ .recv = n }
             else |_|
                 task.result = .{ .recv = error.Unexpected };
+            return task.callback(rt, task.*);
+        },
+
+        .splice => |req| {
+            defer self.releaseTask(rt, task);
+            self.in_flight.remove(task);
+            if (event.flags & EV.ERROR != 0) {
+                // Interpret data as an errno
+                const err = unexpectedError(dataToE(event.data));
+                task.result = .{ .splice = err };
+                return task.callback(rt, task.*);
+            }
+            if (posix.sendfile(req.fd_out, req.fd_in, req.offset, req.nbytes, &.{}, &.{}, 0)) |n|
+                task.result = .{ .splice = n }
+            else |_|
+                task.result = .{ .splice = error.Unexpected };
             return task.callback(rt, task.*);
         },
 
