@@ -730,7 +730,7 @@ pub const Result = union(Op) {
     poll: ResultError!void,
     socket: ResultError!posix.fd_t,
     connect: ResultError!void,
-    statx: ResultError!*Statx,
+    statx: StatError!*Statx,
     readv: ResultError!usize,
     open: OpenError!posix.fd_t,
     read: ResultError!usize,
@@ -764,6 +764,10 @@ pub const RecvError = ResultError || error{
 };
 
 pub const OpenError = ResultError || posix.OpenError;
+
+pub const StatError = ResultError || error{
+    FileNotFound,
+};
 
 test {
     _ = @import("ourio/Mock.zig");

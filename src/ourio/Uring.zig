@@ -417,6 +417,7 @@ pub fn reapCompletions(self: *Uring, rt: *io.Ring) anyerror!void {
                 .SUCCESS => req.result,
                 .INVAL => io.ResultError.Invalid,
                 .CANCELED => io.ResultError.Canceled,
+                .NOENT => io.StatError.FileNotFound,
                 else => |e| unexpectedError(e),
             } },
 
