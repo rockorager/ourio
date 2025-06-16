@@ -630,7 +630,7 @@ fn evSet(ident: usize, filter: i16, flags: u16, ptr: ?*anyopaque) posix.Kevent {
             .fflags = 0,
             .data = 0,
             .udata = @intFromPtr(ptr),
-            ._ext = &.{ 0, 0, 0, 0 },
+            ._ext = .{ 0, 0, 0, 0 },
         },
 
         else => @compileError("kqueue not supported"),
