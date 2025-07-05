@@ -870,10 +870,13 @@ fn handleCompletion(
                 task.result = .{ .read = err };
                 return task.callback(rt, task.*);
             }
-            if (posix.pread(req.fd, req.buffer, @intFromEnum(req.offset))) |n|
-                task.result = .{ .read = n }
-            else |_|
-                task.result = .{ .read = error.Unexpected };
+
+            const result = switch (req.offset) {
+                .file => posix.read(req.fd, req.buffer) catch error.Unexpected,
+                else => posix.pread(req.fd, req.buffer, @intFromEnum(req.offset)) catch error.Unexpected,
+            };
+            task.result = .{ .read = result };
+
             return task.callback(rt, task.*);
         },
 
