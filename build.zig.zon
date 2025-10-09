@@ -7,8 +7,8 @@
 
     .dependencies = .{
         .tls = .{
-            .url = "git+https://github.com/ianic/tls.zig#8250aa9184fbad99983b32411bbe1a5d2fd6f4b7",
-            .hash = "tls-0.1.0-ER2e0pU3BQB-UD2_s90uvppceH_h4KZxtHCrCct8L054",
+            .url = "git+https://github.com/ianic/tls.zig#57b4c591cecfb52818618b583f9911bbd5ab65fa",
+            .hash = "tls-0.1.0-ER2e0sViBQDhLymDUon4ZS-TAB1y7_CDYxcArN3E8pM5",
         },
     },
 

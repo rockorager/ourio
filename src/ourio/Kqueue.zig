@@ -921,10 +921,13 @@ fn handleCompletion(
                 task.result = .{ .splice = err };
                 return task.callback(rt, task.*);
             }
-            if (posix.sendfile(req.fd_out, req.fd_in, req.offset, req.nbytes, &.{}, &.{}, 0)) |n|
-                task.result = .{ .splice = n }
-            else |_|
+            var len: std.c.off_t = @intCast(req.nbytes);
+            const rc = std.c.sendfile(req.fd_in, req.fd_out, @intCast(req.offset), &len, null, 0);
+            if (rc == 0) {
+                task.result = .{ .splice = @intCast(len) };
+            } else {
                 task.result = .{ .splice = error.Unexpected };
+            }
             return task.callback(rt, task.*);
         },
 
