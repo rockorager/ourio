@@ -3,7 +3,7 @@
     .version = "0.0.0",
     .fingerprint = 0xbfe65736d1b3cffe, // Changing this has security and trust implications.
 
-    .minimum_zig_version = "0.14.0",
+    .minimum_zig_version = "0.15.1",
 
     .dependencies = .{
         .tls = .{
