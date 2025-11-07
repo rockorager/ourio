@@ -441,6 +441,7 @@ pub fn reapCompletions(self: *Uring, rt: *io.Ring) anyerror!void {
                 .CANCELED => io.ResultError.Canceled,
                 .NOTDIR => posix.OpenError.NotDir,
                 .ISDIR => posix.OpenError.IsDir,
+                .ACCES => posix.OpenError.AccessDenied,
                 else => |e| unexpectedError(e),
             } },
 
