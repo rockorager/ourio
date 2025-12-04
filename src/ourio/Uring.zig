@@ -442,6 +442,7 @@ pub fn reapCompletions(self: *Uring, rt: *io.Ring) anyerror!void {
                 .NOTDIR => posix.OpenError.NotDir,
                 .ISDIR => posix.OpenError.IsDir,
                 .ACCES => posix.OpenError.AccessDenied,
+                .NOENT => posix.OpenError.FileNotFound,
                 else => |e| unexpectedError(e),
             } },
 
